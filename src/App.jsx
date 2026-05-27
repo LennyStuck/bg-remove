@@ -52,7 +52,7 @@ export default function App() {
   // Background substitution
   const [bgType, setBgType] = useState('transparent');
   const [selectedBg, setSelectedBg] = useState('transparent');
-  const [customColor, setCustomColor] = useState('#9d5cff');
+  const [customColor, setCustomColor] = useState('#9eff00');
 
   // Edge anti-halo settings
   const [erosionAmount, setErosionAmount] = useState(1);
