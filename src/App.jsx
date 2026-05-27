@@ -532,13 +532,13 @@ export default function App() {
                   или нажмите для выбора на компьютере
                 </p>
               </div>
-              <p style={{ color: 'var(--text-muted)', fontSize: '0.75rem', borderTop: '1px solid var(--border-subtle)', width: '100%', maxWidth: '280px', paddingTop: '12px' }}>
+              <p style={{ color: 'var(--text-body)', opacity: 0.4, fontSize: '0.7rem', borderTop: '1px solid var(--border-subtle)', width: '100%', maxWidth: '280px', paddingTop: '12px' }}>
                 PNG, JPG, WEBP • Локальная обработка
               </p>
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '16px' }}>
-              <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>или просто скопируйте картинку и</span>
+              <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem', opacity: 0.5 }}>или просто скопируйте картинку и</span>
               <button className="btn btn-secondary" onClick={pasteFromClipboard} style={{ borderRadius: '10px' }}>
                 <Clipboard size={16} /> Вставьте из буфера (Ctrl+V)
               </button>
@@ -551,13 +551,13 @@ export default function App() {
               // Progress Loading
               <div className="loader-container">
                 <div className="loader-spinner"></div>
-                <h3 style={{ fontWeight: '600', color: 'var(--text-pure)', fontFamily: 'var(--font-display)', fontSize: '1.2rem' }}>
+                <h3 style={{ fontWeight: '600', color: 'var(--text-pure)', fontFamily: 'var(--font-display)', fontSize: '1.1rem', textAlign: 'center', width: '100%' }}>
                   {loadingStep}
                 </h3>
                 <div className="progress-bar-bg" style={{ maxWidth: '440px' }}>
                   <div className="progress-bar-fill" style={{ width: `${progress}%` }}></div>
                 </div>
-                <p style={{ color: 'var(--text-body)', fontSize: '0.8rem', textAlign: 'center', maxWidth: '360px' }}>
+                <p style={{ color: 'var(--text-body)', fontSize: '0.72rem', opacity: 0.45, textAlign: 'center', maxWidth: '360px' }}>
                   При первом запуске скачивается нейросеть (около 70 МБ). Все последующие обработки будут происходить моментально!
                 </p>
               </div>
