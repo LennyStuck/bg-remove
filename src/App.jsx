@@ -475,6 +475,9 @@ export default function App() {
                       <img 
                         src={originalImage} 
                         className="split-image split-image-before" 
+                        style={{
+                          clipPath: `polygon(0 0, ${sliderPosition}% 0, ${sliderPosition}% 100%, 0 100%)`
+                        }}
                         alt="Original"
                       />
                       
