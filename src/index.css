@@ -412,3 +412,132 @@ body {
   margin-top: 40px;
   font-size: 0.8rem;
 }
+
+/* ==========================================
+   RESTORED SLIDER & BACKGROUND SELECTOR STYLES
+   ========================================== */
+
+.split-slider-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  overflow: hidden;
+  user-select: none;
+}
+
+.split-image {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+}
+
+.split-image-before {
+  z-index: 1;
+}
+
+.split-image-after {
+  z-index: 2;
+}
+
+.slider-bar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: #ffffff;
+  z-index: 3;
+  cursor: ew-resize;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+  pointer-events: auto;
+}
+
+.slider-handle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #ffffff;
+  color: #0b0a13;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+}
+
+/* Checkerboard pattern for transparency */
+.transparency-bg {
+  background-image: 
+    linear-gradient(45deg, #09080e 25%, transparent 25%),
+    linear-gradient(-45deg, #09080e 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #09080e 75%),
+    linear-gradient(-45deg, transparent 75%, #09080e 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
+  background-color: #030206;
+}
+
+/* Background Replacement controls */
+.bg-options-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.bg-option-btn {
+  aspect-ratio: 1;
+  border-radius: 8px;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: var(--transition-premium);
+  position: relative;
+  overflow: hidden;
+}
+
+.bg-option-btn:hover {
+  transform: scale(1.05);
+}
+
+/* Background preset colors */
+.bg-trans {
+  background-image: 
+    linear-gradient(45deg, #e0e0e0 25%, transparent 25%),
+    linear-gradient(-45deg, #e0e0e0 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #e0e0e0 75%),
+    linear-gradient(-45deg, transparent 75%, #e0e0e0 75%);
+  background-size: 8px 8px;
+  background-color: #fff;
+}
+.bg-white { background-color: #ffffff; }
+.bg-black { background-color: #000000; }
+.bg-red { background-color: #ef4444; }
+.bg-blue { background-color: #3b82f6; }
+.bg-green { background-color: #10b981; }
+.bg-yellow { background-color: #f59e0b; }
+
+.bg-grad-1 { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+.bg-grad-2 { background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%); }
+.bg-grad-3 { background: linear-gradient(135deg, #f6d365 0%, #fda085 100%); }
+.bg-grad-4 { background: linear-gradient(135deg, #12c2e9 0%, #c471ed 50%, #f64f59 100%); }
+.bg-grad-5 { background: linear-gradient(135deg, #00c6ff 0%, #0072ff 100%); }
+.bg-grad-6 { background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); }
+
+.custom-color-picker {
+  width: 100%;
+  height: 40px;
+  border-radius: 8px;
+  border: 1px solid var(--border-glass);
+  background: transparent;
+  cursor: pointer;
+  margin-top: 12px;
+}
+
