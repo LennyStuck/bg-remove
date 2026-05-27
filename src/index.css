@@ -179,11 +179,13 @@ body {
 }
 
 .hero-desc {
-  font-size: 0.95rem;
-  line-height: 1.5;
+  font-size: 0.8rem;
+  line-height: 1.6;
   color: var(--text-body);
-  max-width: 540px;
+  max-width: 480px;
   margin: 0 auto 12px;
+  opacity: 0.65;
+  letter-spacing: 0.01em;
 }
 
 /* Compact Obsidian Card */
