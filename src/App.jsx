@@ -14,8 +14,8 @@ import {
   Clipboard,
   Sliders,
   Cpu,
-  Shield,
-  Zap
+  Zap,
+  Crop
 } from 'lucide-react';
 
 const GRADIENTS = [
@@ -49,14 +49,16 @@ export default function App() {
   const [dragActive, setDragActive] = useState(false);
   const [sliderPosition, setSliderPosition] = useState(50);
   
-  // Background substitution
+  // Background style
   const [bgType, setBgType] = useState('transparent');
   const [selectedBg, setSelectedBg] = useState('transparent');
-  const [customColor, setCustomColor] = useState('#9eff00');
+  const [customColor, setCustomColor] = useState('#a3e635');
 
-  // Edge anti-halo settings
+  // Edge & layout refinement options
   const [erosionAmount, setErosionAmount] = useState(1);
   const [dehaloEnabled, setDehaloEnabled] = useState(true);
+  const [autoCropEnabled, setAutoCropEnabled] = useState(true); // Autotrim transparency bounding box
+  const [copySuccess, setCopySuccess] = useState(false); // Clipboard visual feedback
 
   const fileInputRef = useRef(null);
   const sliderRef = useRef(null);
@@ -81,7 +83,7 @@ export default function App() {
     return () => window.removeEventListener('paste', handlePaste);
   }, []);
 
-  // Button-triggered clipboard paste
+  // Button clipboard paste
   const pasteFromClipboard = async () => {
     try {
       const clipboardItems = await navigator.clipboard.read();
@@ -101,7 +103,7 @@ export default function App() {
     }
   };
 
-  // Edge Refinement Processing logic
+  // Edge Refinement + Auto-crop Processing logic
   useEffect(() => {
     if (!rawCutoutUrl) return;
 
@@ -109,7 +111,13 @@ export default function App() {
     setIsRefining(true);
 
     const timer = setTimeout(async () => {
-      const refinedUrl = await applyEdgeRefinement(rawCutoutUrl, erosionAmount, dehaloEnabled);
+      let refinedUrl = await applyEdgeRefinement(rawCutoutUrl, erosionAmount, dehaloEnabled);
+      
+      // Auto-crop to content bounds
+      if (autoCropEnabled) {
+        refinedUrl = await applyAutoCrop(refinedUrl);
+      }
+      
       if (active) {
         setCutoutImage(refinedUrl);
         setIsRefining(false);
@@ -120,7 +128,7 @@ export default function App() {
       active = false;
       clearTimeout(timer);
     };
-  }, [rawCutoutUrl, erosionAmount, dehaloEnabled]);
+  }, [rawCutoutUrl, erosionAmount, dehaloEnabled, autoCropEnabled]);
 
   // Grayscale erosion + luminance-based de-haloing filter
   const applyEdgeRefinement = (imgSrc, erosion, dehalo) => {
@@ -189,6 +197,73 @@ export default function App() {
 
         ctx.putImageData(imgData, 0, 0);
         resolve(canvas.toDataURL('image/png'));
+      };
+    });
+  };
+
+  // Transparency bounding-box auto-crop (autotrim)
+  const applyAutoCrop = (imgSrc) => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.src = imgSrc;
+      img.crossOrigin = "anonymous";
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+
+        const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imgData.data;
+        const width = canvas.width;
+        const height = canvas.height;
+
+        let minX = width;
+        let minY = height;
+        let maxX = 0;
+        let maxY = 0;
+        let hasContent = false;
+
+        // Find bounds of non-transparent pixels
+        for (let y = 0; y < height; y++) {
+          for (let x = 0; x < width; x++) {
+            const alpha = data[(y * width + x) * 4 + 3];
+            if (alpha > 8) { // Strict alpha threshold
+              if (x < minX) minX = x;
+              if (x > maxX) maxX = x;
+              if (y < minY) minY = y;
+              if (y > maxY) maxY = y;
+              hasContent = true;
+            }
+          }
+        }
+
+        // If completely blank, return original
+        if (!hasContent) {
+          resolve(imgSrc);
+          return;
+        }
+
+        // Add 12px comfort safety padding, clamped to bounds
+        const padding = 12;
+        const cropX = Math.max(0, minX - padding);
+        const cropY = Math.max(0, minY - padding);
+        const cropWidth = Math.min(width - cropX, (maxX - minX) + padding * 2);
+        const cropHeight = Math.min(height - cropY, (maxY - minY) + padding * 2);
+
+        const trimmedCanvas = document.createElement('canvas');
+        trimmedCanvas.width = cropWidth;
+        trimmedCanvas.height = cropHeight;
+        const trimmedCtx = trimmedCanvas.getContext('2d');
+
+        trimmedCtx.drawImage(
+          canvas,
+          cropX, cropY, cropWidth, cropHeight, // Source bounds
+          0, 0, cropWidth, cropHeight          // Destination bounds
+        );
+
+        resolve(trimmedCanvas.toDataURL('image/png'));
       };
     });
   };
@@ -343,11 +418,12 @@ export default function App() {
     const canvas = await getComposedCanvas();
     if (!canvas) return;
     const link = document.createElement('a');
-    link.download = 'no-bg-' + Date.now() + '.png';
+    link.download = 'cutout-' + Date.now() + '.png';
     link.href = canvas.toDataURL('image/png');
     link.click();
   };
 
+  // Direct Clipboard Copy with interactive button state feedback (Zero browser popups!)
   const copyComposedImage = async () => {
     const canvas = await getComposedCanvas();
     if (!canvas) return;
@@ -356,10 +432,11 @@ export default function App() {
         await navigator.clipboard.write([
           new ClipboardItem({ 'image/png': blob })
         ]);
-        alert('Изображение скопировано в буфер обмена!');
+        setCopySuccess(true);
+        setTimeout(() => setCopySuccess(false), 2000);
       } catch (err) {
         console.error(err);
-        alert('Не удалось скопировать. Предоставьте разрешение на буфер обмена.');
+        alert('Не удалось скопировать в буфер. Предоставьте разрешение в браузере.');
       }
     }, 'image/png');
   };
@@ -374,6 +451,7 @@ export default function App() {
     setSelectedBg('transparent');
     setErosionAmount(1);
     setDehaloEnabled(true);
+    setCopySuccess(false);
   };
 
   const getComposedBgStyle = () => {
@@ -396,10 +474,10 @@ export default function App() {
       <div className="glow-blob glow-2"></div>
       <div className="glow-blob glow-3"></div>
 
-      {/* 1. Sleek Navigation */}
+      {/* 1. Navbar */}
       <nav className="landing-navbar">
         <div className="brand-logo">
-          <Sparkles style={{ color: 'var(--primary)', fill: 'rgba(157, 92, 255, 0.2)' }} />
+          <Sparkles size={20} style={{ color: 'var(--primary)', fill: 'rgba(163, 230, 53, 0.1)' }} />
           <span>Smart Cutout</span>
           <span className="brand-badge">AI v2.0</span>
         </div>
@@ -410,10 +488,10 @@ export default function App() {
         </div>
       </nav>
 
-      {/* 2. Stunning Hero Banner */}
+      {/* 2. Hero Section */}
       <header className="hero-wrapper">
         <span className="hero-tag">
-          <Cpu size={14} style={{ color: '#c084fc' }} /> LOCAL-FIRST NEURAL SEGMENTATION
+          <Cpu size={14} /> LOCAL-FIRST NEURAL SEGMENTATION
         </span>
         <h1 className="hero-title">
           Безупречное удаление фона. <span>В один клик.</span>
@@ -423,10 +501,10 @@ export default function App() {
         </p>
       </header>
 
-      {/* 3. Core App Card - Obsidian Panel */}
+      {/* 3. Obsidian Work Panel */}
       <main className="obsidian-card">
         {!originalImage ? (
-          // Landing/Dropzone State
+          // Empty State
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
             <div 
               className="dropzone-obsidian"
@@ -444,24 +522,24 @@ export default function App() {
                 accept="image/*"
               />
               <div className="dropzone-icon-glow">
-                <Upload size={32} />
+                <Upload size={24} />
               </div>
               <div>
-                <h3 style={{ fontSize: '1.4rem', fontWeight: '700', color: 'var(--text-pure)', fontFamily: 'var(--font-display)', marginBottom: '8px' }}>
+                <h3 style={{ fontSize: '1.25rem', fontWeight: '700', color: 'var(--text-pure)', fontFamily: 'var(--font-display)', marginBottom: '4px' }}>
                   Перетащите изображение сюда
                 </h3>
-                <p style={{ color: 'var(--text-body)', fontSize: '0.95rem' }}>
+                <p style={{ color: 'var(--text-body)', fontSize: '0.9rem' }}>
                   или нажмите для выбора на компьютере
                 </p>
               </div>
-              <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', borderTop: '1px solid var(--border-subtle)', width: '100%', maxWidth: '300px', paddingTop: '16px' }}>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.75rem', borderTop: '1px solid var(--border-subtle)', width: '100%', maxWidth: '280px', paddingTop: '12px' }}>
                 PNG, JPG, WEBP • Локальная обработка
               </p>
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '16px' }}>
-              <span style={{ color: 'var(--text-muted)', fontSize: '0.95rem' }}>или просто скопируйте картинку и</span>
-              <button className="btn btn-secondary" onClick={pasteFromClipboard} style={{ borderRadius: '12px' }}>
+              <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>или просто скопируйте картинку и</span>
+              <button className="btn btn-secondary" onClick={pasteFromClipboard} style={{ borderRadius: '10px' }}>
                 <Clipboard size={16} /> Вставьте из буфера (Ctrl+V)
               </button>
             </div>
@@ -470,21 +548,21 @@ export default function App() {
           // Active Workspace State
           <div>
             {isProcessing ? (
-              // AI Loading Bar
+              // Progress Loading
               <div className="loader-container">
                 <div className="loader-spinner"></div>
-                <h3 style={{ fontWeight: '600', color: 'var(--text-pure)', fontFamily: 'var(--font-display)', fontSize: '1.25rem' }}>
+                <h3 style={{ fontWeight: '600', color: 'var(--text-pure)', fontFamily: 'var(--font-display)', fontSize: '1.2rem' }}>
                   {loadingStep}
                 </h3>
-                <div className="progress-bar-bg" style={{ maxWidth: '480px' }}>
+                <div className="progress-bar-bg" style={{ maxWidth: '440px' }}>
                   <div className="progress-bar-fill" style={{ width: `${progress}%` }}></div>
                 </div>
-                <p style={{ color: 'var(--text-body)', fontSize: '0.85rem', textAlign: 'center', maxWidth: '380px' }}>
-                  Первый запуск инициализирует нейросеть (около 70 МБ). Все последующие обработки будут происходить моментально!
+                <p style={{ color: 'var(--text-body)', fontSize: '0.8rem', textAlign: 'center', maxWidth: '360px' }}>
+                  При первом запуске скачивается нейросеть (около 70 МБ). Все последующие обработки будут происходить моментально!
                 </p>
               </div>
             ) : (
-              // Active Split Screen Preview & Panel Grid
+              // Split Slider Preview & Configurations Panel
               <div className="workspace-grid">
                 
                 {/* Visual Area */}
@@ -518,7 +596,7 @@ export default function App() {
                           alt="Cutout"
                         />
 
-                        {/* Split Bar */}
+                        {/* Slider bar */}
                         <div 
                           className="slider-bar" 
                           style={{ left: `${sliderPosition}%` }}
@@ -537,11 +615,11 @@ export default function App() {
                   </div>
                   
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <p style={{ fontSize: '0.85rem', color: 'var(--text-body)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <Maximize2 size={14} style={{ color: 'var(--primary)' }} /> Тяните шторку в центре для сравнения результата
+                    <p style={{ fontSize: '0.8rem', color: 'var(--text-body)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <Maximize2 size={12} style={{ color: 'var(--primary)' }} /> Двигайте шторку в центре для сравнения результата
                     </p>
-                    <button className="btn btn-secondary" onClick={resetWorkspace} style={{ padding: '8px 16px', fontSize: '0.85rem', borderRadius: '10px' }}>
-                      <Trash2 size={14} /> Сбросить проект
+                    <button className="btn btn-secondary" onClick={resetWorkspace} style={{ padding: '8px 16px', fontSize: '0.8rem', borderRadius: '10px' }}>
+                      <Trash2 size={12} /> Сбросить
                     </button>
                   </div>
                 </div>
@@ -549,16 +627,16 @@ export default function App() {
                 {/* Configurations Panel */}
                 <div className="sidebar-panel">
                   
-                  {/* Anti-Halo Panel */}
+                  {/* Anti-Halo & Auto-crop */}
                   <div className="control-box-obsidian">
                     <div className="control-title" style={{ fontFamily: 'var(--font-display)', fontWeight: '600', color: 'var(--text-pure)' }}>
-                      <Sliders size={16} style={{ color: 'var(--primary)' }} /> Устранение светлого ареола
+                      <Sliders size={16} style={{ color: 'var(--primary)' }} /> Тонкая настройка краев
                     </div>
                     
-                    {/* Erosion Range */}
+                    {/* Erosion range */}
                     <div style={{ marginBottom: '16px', marginTop: '12px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '6px' }}>
-                        <span style={{ color: 'var(--text-body)' }}>Сжатие краев:</span>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '6px' }}>
+                        <span style={{ color: 'var(--text-body)' }}>Сжатие контура:</span>
                         <span style={{ fontWeight: 'bold', color: 'var(--primary)' }}>{erosionAmount} px</span>
                       </div>
                       <input 
@@ -571,19 +649,32 @@ export default function App() {
                       />
                     </div>
 
-                    {/* Luminance Dehalo Toggle */}
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '0.85rem', color: 'var(--text-body)' }}>
+                    {/* De-halo checkbox */}
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '0.8rem', color: 'var(--text-body)', marginBottom: '12px' }}>
                       <input 
                         type="checkbox" 
                         checked={dehaloEnabled}
                         onChange={(e) => setDehaloEnabled(e.target.checked)}
-                        style={{ width: '16px', height: '16px', accentColor: 'var(--primary)' }}
+                        style={{ width: '15px', height: '15px', accentColor: 'var(--primary)' }}
                       />
-                      Ослаблять белый ареол на стыках
+                      Ослаблять белый ареол
+                    </label>
+
+                    {/* Auto-crop transparent bounds checkbox */}
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '0.8rem', color: 'var(--text-body)', borderTop: '1px solid var(--border-subtle)', paddingTop: '10px' }}>
+                      <input 
+                        type="checkbox" 
+                        checked={autoCropEnabled}
+                        onChange={(e) => setAutoCropEnabled(e.target.checked)}
+                        style={{ width: '15px', height: '15px', accentColor: 'var(--primary)' }}
+                      />
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                        <Crop size={12} style={{ color: 'var(--primary)' }} /> Обрезать холст под объект
+                      </span>
                     </label>
                   </div>
 
-                  {/* Custom Background Sub */}
+                  {/* Background Selector */}
                   <div className="control-box-obsidian">
                     <div className="control-title" style={{ fontFamily: 'var(--font-display)', fontWeight: '600', color: 'var(--text-pure)' }}>
                       <Layers size={16} style={{ color: 'var(--primary)' }} /> Замена подложки
@@ -592,21 +683,21 @@ export default function App() {
                     <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', marginTop: '12px' }}>
                       <button 
                         className={`btn btn-secondary ${bgType === 'transparent' ? 'selected' : ''}`}
-                        style={{ flex: 1, padding: '8px 12px', fontSize: '0.8rem', border: bgType === 'transparent' ? '1px solid var(--primary)' : 'none', borderRadius: '10px' }}
+                        style={{ flex: 1, padding: '8px 12px', fontSize: '0.75rem', border: bgType === 'transparent' ? '1px solid var(--primary)' : 'none', borderRadius: '8px' }}
                         onClick={() => { setBgType('transparent'); setSelectedBg('transparent'); }}
                       >
                         Прозрачный
                       </button>
                       <button 
                         className={`btn btn-secondary ${bgType === 'color' ? 'selected' : ''}`}
-                        style={{ flex: 1, padding: '8px 12px', fontSize: '0.8rem', border: bgType === 'color' ? '1px solid var(--primary)' : 'none', borderRadius: '10px' }}
+                        style={{ flex: 1, padding: '8px 12px', fontSize: '0.75rem', border: bgType === 'color' ? '1px solid var(--primary)' : 'none', borderRadius: '8px' }}
                         onClick={() => { setBgType('color'); setSelectedBg('#ffffff'); }}
                       >
                         Цвет
                       </button>
                       <button 
                         className={`btn btn-secondary ${bgType === 'gradient' ? 'selected' : ''}`}
-                        style={{ flex: 1, padding: '8px 12px', fontSize: '0.8rem', border: bgType === 'gradient' ? '1px solid var(--primary)' : 'none', borderRadius: '10px' }}
+                        style={{ flex: 1, padding: '8px 12px', fontSize: '0.75rem', border: bgType === 'gradient' ? '1px solid var(--primary)' : 'none', borderRadius: '8px' }}
                         onClick={() => { setBgType('gradient'); setSelectedBg(GRADIENTS[0]); }}
                       >
                         Градиент
@@ -652,8 +743,8 @@ export default function App() {
                     {bgType === 'custom' && (
                       <div>
                         <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '8px' }}>
-                          <div style={{ width: '24px', height: '24px', borderRadius: '6px', background: customColor, border: '1px solid var(--border-glass)' }}></div>
-                          <span style={{ fontSize: '0.85rem', fontFamily: 'monospace' }}>{customColor}</span>
+                          <div style={{ width: '20px', height: '20px', borderRadius: '6px', background: customColor, border: '1px solid var(--border-glass)' }}></div>
+                          <span style={{ fontSize: '0.8rem', fontFamily: 'monospace' }}>{customColor}</span>
                         </div>
                         <input 
                           type="color" 
@@ -665,28 +756,32 @@ export default function App() {
                     )}
                     
                     {bgType === 'transparent' && (
-                      <p style={{ fontSize: '0.8rem', color: 'var(--text-body)' }}>
+                      <p style={{ fontSize: '0.75rem', color: 'var(--text-body)' }}>
                         Будет скопировано или скачано в формате PNG с сохранением прозрачности.
                       </p>
                     )}
                   </div>
 
-                  {/* CTA Buttons */}
+                  {/* Actions CTA */}
                   <div className="control-box-obsidian" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     <button 
                       className="btn btn-primary"
-                      style={{ width: '100%', padding: '16px', borderRadius: '12px' }}
+                      style={{ width: '100%', padding: '14px', borderRadius: '10px' }}
                       onClick={downloadComposedImage}
                     >
-                      <Download size={18} /> Скачать изображение
+                      <Download size={16} /> Скачать изображение
                     </button>
 
                     <button 
                       className="btn btn-secondary"
-                      style={{ width: '100%', color: 'var(--primary-hover)', borderColor: 'rgba(157, 92, 255, 0.2)' }}
+                      style={{ 
+                        width: '100%', 
+                        color: copySuccess ? '#a3e635' : 'var(--text-pure)', 
+                        borderColor: copySuccess ? '#a3e635' : 'rgba(255, 255, 255, 0.04)' 
+                      }}
                       onClick={copyComposedImage}
                     >
-                      <Copy size={16} /> Скопировать в буфер
+                      <Copy size={14} /> {copySuccess ? 'Успешно скопировано! ✓' : 'Скопировать в буфер'}
                     </button>
                     
                     <button 
@@ -694,7 +789,7 @@ export default function App() {
                       style={{ width: '100%' }}
                       onClick={() => removeBackground(originalImage)}
                     >
-                      <RefreshCw size={14} /> Переобработать заново
+                      <RefreshCw size={12} /> Переобработать
                     </button>
                   </div>
 
@@ -705,11 +800,11 @@ export default function App() {
         )}
       </main>
 
-      {/* 4. Beautiful Editorial Feature Deck (Framer-style grid) */}
+      {/* 4. Editorial Features Grid */}
       <section className="features-grid">
         <div className="feature-box">
           <div className="feature-icon-badge">
-            <Cpu size={20} />
+            <Cpu size={18} />
           </div>
           <h4 className="feature-title">Neural Engine Local</h4>
           <p className="feature-text">
@@ -719,7 +814,7 @@ export default function App() {
 
         <div className="feature-box">
           <div className="feature-icon-badge">
-            <Sparkles size={20} />
+            <Sparkles size={18} />
           </div>
           <h4 className="feature-title">Anti-Halo Matting</h4>
           <p className="feature-text">
@@ -729,7 +824,7 @@ export default function App() {
 
         <div className="feature-box">
           <div className="feature-icon-badge">
-            <Zap size={20} />
+            <Zap size={18} />
           </div>
           <h4 className="feature-title">Clipboard Integration</h4>
           <p className="feature-text">
@@ -738,13 +833,13 @@ export default function App() {
         </div>
       </section>
 
-      {/* 5. Minimalist Design Footer */}
+      {/* 5. Footer */}
       <footer className="landing-footer">
         <div>
           <span style={{ color: 'var(--text-pure)', fontWeight: '700', fontFamily: 'var(--font-display)' }}>Smart Cutout</span>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginTop: '6px' }}>© 2026. Crafted for professional designers.</p>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginTop: '6px' }}>© 2026. Crafted for professional designers.</p>
         </div>
-        <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+        <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>
           WebGL & WebGPU Accelerated • ONNX Engine v1.7.0
         </div>
       </footer>
