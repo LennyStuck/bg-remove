@@ -477,7 +477,11 @@ export default function App() {
       {/* 1. Navbar */}
       <nav className="landing-navbar">
         <div className="brand-logo">
-          <Sparkles size={20} style={{ color: 'var(--primary)', fill: 'rgba(163, 230, 53, 0.1)' }} />
+          <svg width="22" height="22" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ marginRight: '2px' }}>
+            <path d="M 110,110 L 402,110 L 110,402 Z" fill="#ffffff" />
+            <path d="M 402,402 L 402,180 L 180,402 Z" fill="none" stroke="var(--primary)" strokeWidth="24" strokeLinejoin="round" strokeLinecap="round" />
+            <line x1="70" y1="442" x2="442" y2="70" stroke="var(--primary)" strokeWidth="32" strokeLinecap="round" />
+          </svg>
           <span>Smart Cutout</span>
           <span className="brand-badge">AI v2.0</span>
         </div>
